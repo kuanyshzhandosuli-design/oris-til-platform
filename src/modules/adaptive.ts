@@ -26,8 +26,9 @@ export function skillScore(d:State,skill:Skill):number|null{
 }
 
 export function learnerLevel(d:State):'A1'|'A2'|'B1'|'B2'|null{
-  const score=d.diagnosticRuns?.[d.diagnosticRuns.length-1]?.score;
-  const total=d.diagnosticRuns?.[d.diagnosticRuns.length-1]?.total;
+  const latest=d.diagnosticRuns?.[d.diagnosticRuns.length-1];
+  const score=latest?.baselineScore??latest?.score;
+  const total=latest?.baselineTotal??latest?.total;
   if(!d.diagnosed||!total)return null;
   const pct=score!/total*100;
   return pct>=88?'B2':pct>=72?'B1':pct>=50?'A2':'A1';
@@ -55,4 +56,3 @@ export function learnerProfile(d:State){
   const scored=skills.map(skill=>({skill,label:skillLabel(skill),score:skillScore(d,skill)})).filter(x=>x.score!==null) as {skill:Skill;label:string;score:number}[];
   const weak=scored.filter(x=>x.score<70).sort((a,b)=>a.score-b.score).slice(0,2),strong=scored.filter(x=>x.score>=80).sort((a,b)=>b.score-a.score).slice(0,2);return {level:learnerLevel(d),scored,weak,strong,next:weak[0]||scored.filter(x=>x.score<80).sort((a,b)=>a.score-b.score)[0]||scored.sort((a,b)=>a.score-b.score)[0]||null};
 }
-
