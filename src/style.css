@@ -72,3 +72,13 @@
 .mobile-more-menu button span{width:22px;text-align:center;font-size:16px}
 .mobile-more-menu button small{font-size:12px}
 .mobile-more-menu button.active{color:#3571d7;background:#edf4ff;font-weight:700}
+.review-schedule{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-4px 0 13px;padding:10px 12px;border-radius:9px;background:#f7f9fc;color:#66748b;font-size:11px}
+.review-schedule small{color:#9aa5b5}
+.install-app{position:fixed;right:18px;bottom:18px;z-index:12;padding:11px 15px;border-radius:999px;background:#3977dc;color:#fff;font-size:12px;font-weight:700;box-shadow:0 8px 24px #24477d35}
+.install-app:hover{background:#2d68c8;transform:translateY(-1px)}
+@media(max-width:760px){
+  .error-work-list .tabs{overflow-x:auto;flex-wrap:nowrap}
+  .error-work-list .tabs button{white-space:nowrap;flex:none}
+  .review-schedule{align-items:flex-start;flex-direction:column;gap:4px}
+  .install-app{right:10px;bottom:calc(76px + env(safe-area-inset-bottom));font-size:11px;padding:10px 12px}
+}

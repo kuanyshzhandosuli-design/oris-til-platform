@@ -31,18 +31,25 @@ function send(res,status,data,headers={}){res.writeHead(status,{'content-type':'
 async function body(req){let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>2_000_000)throw Object.assign(new Error('Сұрау көлемі тым үлкен.'),{status:413})}try{return raw?JSON.parse(raw):{}}catch{throw Object.assign(new Error('JSON пішімі жарамсыз.'),{status:400})}}
 function setCookie(res,token,maxAge=7*24*60*60){res.setHeader('Set-Cookie',`${cookieName}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure?'; Secure':''}`)}
 function clearCookie(res){res.setHeader('Set-Cookie',`${cookieName}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure?'; Secure':''}`)}
-function sessionUser(req){const token=(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(cookieName+'='))?.slice(cookieName.length+1);if(!token)return null;const row=db.prepare('SELECT u.*,s.token_hash FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?').get(tokenDigest(decodeURIComponent(token)),Date.now());return row||null}
+function requestToken(req){const bearer=String(req.headers.authorization||'').match(/^Bearer\s+(.+)$/i)?.[1];if(bearer)return bearer;return(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(cookieName+'='))?.slice(cookieName.length+1)||null}
+function sessionUser(req){const token=requestToken(req);if(!token)return null;let decoded=token;try{decoded=decodeURIComponent(token)}catch{}const row=db.prepare('SELECT u.*,s.token_hash FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?').get(tokenDigest(decoded),Date.now());return row||null}
 function requireRole(user,role){if(!user)throw Object.assign(new Error('Жүйеге қайта кіріңіз.'),{status:401});if(user.role!==role)throw Object.assign(new Error('Бұл әрекетке құқық берілмеген.'),{status:403})}
-function checkOrigin(req){const origin=req.headers.origin;if(!origin)return;const allowed=(process.env.APP_ORIGIN||'').split(',').map(x=>x.trim()).filter(Boolean);const host=req.headers.host;let same=false;try{same=new URL(origin).host===host}catch{}const localDev=/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(new URL(origin).host)&&/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host||'');if(!same&&!localDev&&!allowed.includes(origin))throw Object.assign(new Error('Сұрау көзі рұқсат етілмеген.'),{status:403})}
+function originAllowed(origin,req){if(!origin)return false;const allowed=(process.env.APP_ORIGIN||'').split(',').map(x=>x.trim()).filter(Boolean);const host=req.headers.host;let originHost='';try{originHost=new URL(origin).host}catch{return false}const same=originHost===host,localDev=/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(originHost)&&/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host||'');return same||localDev||allowed.includes(origin)}
+function checkOrigin(req){const origin=req.headers.origin;if(origin&&!originAllowed(origin,req))throw Object.assign(new Error('Сұрау көзі рұқсат етілмеген.'),{status:403})}
+function corsHeaders(req){const origin=req.headers.origin;if(!origin||!originAllowed(origin,req))return{};return{'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET, POST, PUT, PATCH, DELETE, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600','Vary':'Origin'}}
 function getState(userId){const row=db.prepare('SELECT data FROM learner_state WHERE user_id=?').get(userId);return row?JSON.parse(row.data):{records:[],known:[],favorites:[],xp:0,streak:0,last:'',diagnosed:false,diagnosticScore:null,diagnosticRuns:[],dictations:[],errors:[],weeklyResults:[],goal:3,notifications:[]}}
 function storeState(userId,payload,user){const data=payload?.state&&typeof payload.state==='object'?payload.state:payload;if(!data||typeof data!=='object'||Array.isArray(data))throw Object.assign(new Error('Оқу деректері жарамсыз.'),{status:400});const safe={...data};for(const key of ['accounts','teacherStudents','assignments','password','passwordHash','authenticated','email','role','name','grade'])delete safe[key];db.prepare('INSERT INTO learner_state(user_id,data,updated_at) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at').run(user.id,JSON.stringify(safe),now());return {...safe,role:user.role,name:user.name,grade:user.grade,email:user.username,authenticated:true,assignments:[]}}
-function newSession(res,user){const token=randomBytes(32).toString('base64url'),expires=Date.now()+7*24*60*60*1000;db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').run(tokenDigest(token),user.id,expires);setCookie(res,token)}
+function newSession(res,user){const token=randomBytes(32).toString('base64url'),expires=Date.now()+7*24*60*60*1000;db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').run(tokenDigest(token),user.id,expires);setCookie(res,token);return token}
 function assignmentView(a,submission=null){return {id:a.id,title:a.title,topic:a.topic,instructions:a.instructions,content:a.content,due:a.due_at,difficulty:a.difficulty,status:a.status,student:a.target_username||null,done:submission?.status==='reviewed',submission:submission?{id:submission.id,username:submission.username,student:submission.student_name,answer:submission.answer,status:submission.status,score:submission.score,feedback:submission.feedback,submittedAt:submission.submitted_at}:null,createdAt:a.created_at}}
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon','.json':'application/json'};
 
 const server=createServer(async(req,res)=>{
   try{
     const url=new URL(req.url,'http://localhost');
+    if(url.pathname.startsWith('/api/')){
+      const cors=corsHeaders(req);for(const[key,value]of Object.entries(cors))res.setHeader(key,value);
+      if(req.method==='OPTIONS')return res.writeHead(req.headers.origin&&!cors['Access-Control-Allow-Origin']?403:204).end();
+    }
     if(url.pathname.startsWith('/api/')&&['POST','PUT','PATCH','DELETE'].includes(req.method))checkOrigin(req);
     let user=sessionUser(req);
     if(req.method==='GET'&&url.pathname==='/api/health')return send(res,200,{ok:true});
@@ -62,15 +69,15 @@ const server=createServer(async(req,res)=>{
       }
       let teacherId=null;
       if(role==='student'&&b.teacherLogin){const teacher=db.prepare("SELECT id FROM users WHERE username=? COLLATE NOCASE AND role='teacher'").get(String(b.teacherLogin).trim());if(!teacher)return send(res,400,{error:'Мұғалім логині табылмады. Дұрыс логинді тексер.'});teacherId=teacher.id;}
-      const id=randomUUID();db.prepare('INSERT INTO users(id,username,password_hash,role,name,grade,teacher_id,created_at) VALUES(?,?,?,?,?,?,?,?)').run(id,username,passwordHash(password),role,name,role==='student'?grade:'',teacherId,now());const created=db.prepare('SELECT * FROM users WHERE id=?').get(id);newSession(res,created);return send(res,201,{user:userView(created),state:getState(id)});
+      const id=randomUUID();db.prepare('INSERT INTO users(id,username,password_hash,role,name,grade,teacher_id,created_at) VALUES(?,?,?,?,?,?,?,?)').run(id,username,passwordHash(password),role,name,role==='student'?grade:'',teacherId,now());const created=db.prepare('SELECT * FROM users WHERE id=?').get(id),sessionToken=newSession(res,created);return send(res,201,{user:userView(created),state:getState(id),sessionToken});
     }
     if(req.method==='POST'&&url.pathname==='/api/auth/login'){
       const b=await body(req),username=String(b.username||'').trim().toLowerCase(),password=String(b.password||'');const found=db.prepare('SELECT * FROM users WHERE username=? COLLATE NOCASE').get(username);
       if(!found||!passwordMatches(password,found.password_hash))return send(res,401,{error:'Логин немесе құпиясөз қате.'});
-      db.prepare('DELETE FROM sessions WHERE user_id=? AND expires_at<=?').run(found.id,Date.now());newSession(res,found);return send(res,200,{user:userView(found),state:getState(found.id)});
+      db.prepare('DELETE FROM sessions WHERE user_id=? AND expires_at<=?').run(found.id,Date.now());const sessionToken=newSession(res,found);return send(res,200,{user:userView(found),state:getState(found.id),sessionToken});
     }
     if(req.method==='POST'&&url.pathname==='/api/auth/logout'){
-      const token=(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(cookieName+'='))?.slice(cookieName.length+1);if(token)db.prepare('DELETE FROM sessions WHERE token_hash=?').run(tokenDigest(decodeURIComponent(token)));clearCookie(res);return send(res,200,{ok:true});
+      const token=requestToken(req);if(token){let decoded=token;try{decoded=decodeURIComponent(token)}catch{}db.prepare('DELETE FROM sessions WHERE token_hash=?').run(tokenDigest(decoded))}clearCookie(res);return send(res,200,{ok:true});
     }
     if(url.pathname.startsWith('/api/')){
       if(!user)return send(res,401,{error:'Жүйеге қайта кіріңіз.'});
@@ -113,4 +120,3 @@ const port=Number(process.env.PORT||8787);
 server.listen(port,'0.0.0.0',()=>console.log(`TilPro server listening on ${port}; persistent SQLite database: ${dbPath}`));
 function close(){server.close(()=>{db.close();process.exit(0)})}
 process.on('SIGINT',close);process.on('SIGTERM',close);
-

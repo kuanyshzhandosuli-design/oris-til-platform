@@ -1,5 +1,5 @@
 export type RecordItem={id:string;tag:string;correct:boolean;date:string;xp:number;wrong?:string;answer?:string;explanation?:string;source?:string;weekDay?:string};
-export type ErrorEntry={id:string;wrong:string;answer:string;topic:string;category:string;explanation:string;date:string;repeats:number;fixed:boolean;mastery?:number;acknowledged?:boolean;source?:string;weekDay?:string;lastAttemptCorrect?:boolean};
+export type ErrorEntry={id:string;wrong:string;answer:string;topic:string;category:string;explanation:string;date:string;repeats:number;fixed:boolean;mastery?:number;acknowledged?:boolean;source?:string;weekDay?:string;lastAttemptCorrect?:boolean;reviewStage?:number;nextReviewAt?:string;lastReviewedAt?:string};
 export type WeeklyTaskResult={dayId:string;sectionId:string;taskId:string;correct:boolean;answer:string;date:string;xp:number};
 export type Submission={id:string;username:string;student:string;answer:string;status:'in_progress'|'submitted'|'reviewed'|'redo';score:number|null;feedback:string;submittedAt:string};
 export type Assignment={id?:string;title:string;student?:string|null;done:boolean;due?:string;topic?:string;instructions?:string;content?:string;difficulty?:string;status?:'draft'|'published';submission?:Submission|null;submissions?:Submission[]};

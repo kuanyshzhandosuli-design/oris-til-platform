@@ -1,0 +1,14 @@
+{
+  "name": "TilPro — Орыс тілін үйрену",
+  "short_name": "TilPro",
+  "description": "Қазақтілді оқушыға арналған орыс тілі платформасы",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f7f9fc",
+  "theme_color": "#f7f9fc",
+  "icons": [
+    { "src": "./tilpro-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
