@@ -1,0 +1,10 @@
+export type RecordItem={id:string;tag:string;correct:boolean;date:string;xp:number;wrong?:string;answer?:string;explanation?:string;source?:string;weekDay?:string};
+export type ErrorEntry={id:string;wrong:string;answer:string;topic:string;category:string;explanation:string;date:string;repeats:number;fixed:boolean;mastery?:number;acknowledged?:boolean;source?:string;weekDay?:string;lastAttemptCorrect?:boolean};
+export type WeeklyTaskResult={dayId:string;sectionId:string;taskId:string;correct:boolean;answer:string;date:string;xp:number};
+export type Submission={id:string;username:string;student:string;answer:string;status:'in_progress'|'submitted'|'reviewed'|'redo';score:number|null;feedback:string;submittedAt:string};
+export type Assignment={id?:string;title:string;student?:string|null;done:boolean;due?:string;topic?:string;instructions?:string;content?:string;difficulty?:string;status?:'draft'|'published';submission?:Submission|null;submissions?:Submission[]};
+export type ClassStudent={id?:string;username?:string;name:string;grade:string;level:string;score:number;xp:number;weak:string;diagnosed?:boolean;diagnosticScore?:number|null;records?:RecordItem[];errors?:ErrorEntry[];diagnosticRuns?:DiagnosticRun[];weeklyResults?:WeeklyTaskResult[]};
+export type LocalAccount={id?:string;email:string;username?:string;role:'student'|'teacher';name:string;grade:string;teacherId?:string|null};
+export type DiagnosticRun={score:number;total:number;date:string;answers:number[];byTopic:{topic:string;correct:number;total:number}[]};
+export type State={role:'student'|'teacher';name:string;grade:string;records:RecordItem[];known:(number|string)[];favorites:(number|string)[];xp:number;streak:number;last:string;diagnosed:boolean;diagnosticScore:number|null;diagnosticRuns:DiagnosticRun[];dictations:{title:string;score:number;date:string}[];assignments:Assignment[];errors:ErrorEntry[];weeklyResults?:WeeklyTaskResult[];customTopics?:{id:string;title:string;weekday:string;description:string}[];goal:number;authenticated:boolean;email:string;notifications:string[];teacherStudents?:ClassStudent[];accounts?:LocalAccount[];classes?:string[]}
+

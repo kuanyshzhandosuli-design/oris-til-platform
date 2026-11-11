@@ -1,0 +1,39 @@
+import {useEffect,useState} from 'react';
+import type {State,LocalAccount} from '../types';
+import {apiRequest,initialState} from '../services/storage';
+
+type AuthResult={user:Omit<LocalAccount,'email'>&{username:string;email?:string};state:Partial<State>};
+type Props={set:(value:State)=>void;serverOnline:boolean;onEnter:(role:'student'|'teacher',diagnosed:boolean)=>void};
+type View='landing'|'login'|'register';
+
+export default function Auth({set,serverOnline,onEnter}:Props){
+  const[view,V]=useState<View>('landing'),[role,R]=useState<'student'|'teacher'>('student'),[username,U]=useState(''),[pass,P]=useState(''),[confirm,C]=useState(''),[name,N]=useState(''),[grade,G]=useState('7 «А»'),[teacherLogin,TL]=useState(''),[teacherCode,TC]=useState(''),[err,X]=useState(''),[busy,B]=useState(false);
+  function enterDemo(){
+    const demo:State={...initialState,role:'student',name:'Демо оқушы',grade:'7 «А»',authenticated:true,email:'demo@tilpro.local',diagnosed:true,diagnosticScore:67,diagnosticRuns:[{score:20,total:30,date:'Демо нәтиже',answers:[],byTopic:[{topic:'Сөздік қор',correct:4,total:5},{topic:'падежи',correct:2,total:5},{topic:'глаголы',correct:4,total:5},{topic:'Согласование',correct:3,total:5},{topic:'Чтение',correct:4,total:5},{topic:'Правописание',correct:3,total:5}]}],records:[{id:'demo-1',tag:'Грамматика · падежи',correct:false,date:'Демо',xp:2,wrong:'в школа',answer:'в школу',explanation:'«Куда?» деген сұрақ бағытты білдіреді: «в школу».',source:'Демо тапсырмасы'},{id:'demo-2',tag:'Сөздік қор',correct:true,date:'Демо',xp:10},{id:'demo-3',tag:'Грамматика · глаголы',correct:true,date:'Демо',xp:10},{id:'demo-4',tag:'Чтение',correct:true,date:'Демо',xp:10},{id:'demo-5',tag:'Сөздік қор',correct:true,date:'Демо',xp:10}],errors:[{id:'demo-error-1',wrong:'Я пошёл в школа.',answer:'Я пошёл в школу.',topic:'Үй жануарлары · Септік',category:'Грамматикалық',explanation:'«Куда?» деген сұрақ бағытты білдіреді. «В» предлогынан кейін «школа» сөзі «школу» болып өзгереді.',date:'Демо',repeats:2,fixed:false,mastery:1,acknowledged:false,source:'Демо тапсырмасы',weekDay:'Дүйсенбі'}],xp:42,streak:2,known:['pets-w1','pets-w2','pets-w3'],weeklyResults:[{dayId:'pets',sectionId:'grammar',taskId:'demo-task-1',correct:true,answer:'маленькая',date:'Демо',xp:10},{dayId:'pets',sectionId:'grammar',taskId:'demo-task-2',correct:false,answer:'спят',date:'Демо',xp:2}]};
+    set(demo);onEnter('student',true);
+  }
+  useEffect(()=>{if(window.location.hash==='#demo')enterDemo()},[]);
+  async function enter(){
+    X('');const login=username.trim().toLowerCase();if(view==='login'&&!serverOnline){if(login==='demo'&&pass==='tilpro123'){enterDemo();return}X('Сервер жоқ: платформаны сынау үшін demo / tilpro123 қолданыңыз.');return}
+    if(!/^(?=.*[a-z])[a-z0-9_]{3,32}$/.test(login)){X('Логин 3–32 таңбадан тұрып, латын әріптері, сандар және _ белгісін ғана қолдансын.');return}
+    if(view==='register'){
+      if(pass.length<6){X('Құпиясөз кемінде 6 таңбадан тұруы керек.');return}
+      if(pass!==confirm){X('Құпиясөздер бірдей емес.');return}
+      if(name.trim().length<2){X('Аты-жөніңді енгіз.');return}
+      if(role==='teacher'&&!teacherCode.trim()){X('Мұғалім аккаунтын ашу үшін әкімші берген шақыру кодын енгіз.');return}
+    }else if(!pass){X('Құпиясөзді енгіз.');return}
+    B(true);
+    try{
+      const result=await apiRequest<AuthResult>(view==='register'?'/api/auth/register':'/api/auth/login',{method:'POST',body:JSON.stringify(view==='register'?{username:login,password:pass,name:name.trim(),grade,role,teacherCode,teacherLogin:role==='student'?teacherLogin.trim():''}:{username:login,password:pass})});
+      const next:State={...initialState,...result.state,role:result.user.role,name:result.user.name,grade:result.user.grade,email:result.user.username,authenticated:true};set(next);onEnter(result.user.role,next.diagnosed);
+    }catch(error){X(error instanceof Error?error.message:'Серверге қосылу мүмкін болмады.');}
+    finally{B(false)}
+  }
+  return <div className="authshell"><div className="authbrand"><span className="brandmark">Т</span><b>tilpro</b></div>
+    {view==='landing'?<div className="landing"><div className="eyebrow">ҚАЗАҚТІЛДІ ОҚУШЫҒА АРНАЛҒАН</div><h1>Орыс тілін жаттап қана қоймай, <span>меңгер!</span></h1><p>Жеке оқу маршруты, тақырыптық тапсырмалар және нақты даму статистикасы.</p><button className="primary" onClick={()=>{X('');V('register')}}>Тіркелу →</button><button className="outline" onClick={()=>{X('');V('login')}}>Кіру</button><div className="landing-cards"><div className="landing-card">✦<b>Жеке тапсырмалар</b><small>Деңгейің мен нәтижелеріңе бейімделеді</small></div><div className="landing-card">⚑<b>Қателер паспорты</b><small>Қазақша түсіндірме және қайта жаттығу</small></div><div className="landing-card">⌁<b>Нақты даму картасы</b><small>Жеке аккаунтта серверге сақталады</small></div></div>
+      {!serverOnline&&<><div className="feedback no">Қазір платформаны демо аккаунтпен сынап көруге болады.</div><button className="primary wide" onClick={enterDemo}>Демо аккаунтпен кіру →</button><p className="mutedtext">Демо логин: <b>demo</b> · Құпиясөз: <b>tilpro123</b></p><button className="outline" onClick={()=>{U('demo');P('tilpro123');V('login')}}>Логин мен парольді енгізу</button></>}</div>:<div className="panel authcard"><button className="link" onClick={()=>{X('');V('landing')}}>← Басты бет</button><h2>{view==='login'?'TilPro жүйесіне кіру':'TilPro-ға тіркелу'}</h2><p>{view==='login'?'Логин мен құпиясөз арқылы аккаунтыңа кір.':'Жеке оқу кабинетін ашу үшін мәліметтерді енгіз.'}</p>
+      {view==='register'&&<><label className="fieldlabel">Аккаунт түрі</label><select value={role} onChange={e=>R(e.target.value as 'student'|'teacher')}><option value="student">Оқушы</option><option value="teacher">Мұғалім (шақыру кодымен)</option></select><label className="fieldlabel">Аты-жөні</label><input className="search" autoComplete="name" placeholder="Аружан Қасым" value={name} onChange={e=>N(e.target.value)}/>{role==='student'&&<><label className="fieldlabel">Сынып</label><select value={grade} onChange={e=>G(e.target.value)}>{[5,6,7,8,9].map(x=><option key={x}>{x} «А»</option>)}</select><label className="fieldlabel">Мұғалім логині (міндетті емес)</label><input className="search" autoComplete="off" placeholder="Мұғалім берген логин" value={teacherLogin} onChange={e=>TL(e.target.value)}/></>}{role==='teacher'&&<><label className="fieldlabel">Әкімші берген шақыру коды</label><input className="search" type="password" autoComplete="off" value={teacherCode} onChange={e=>TC(e.target.value)}/></>}</>}
+      <label className="fieldlabel">Логин</label><input className="search" autoComplete="username" placeholder="Latin_login_123" value={username} onChange={e=>U(e.target.value)}/><small className="mutedtext">3–32 таңба: латын әріптері, сандар және _</small><label className="fieldlabel">Құпиясөз</label><input className="search" type="password" autoComplete={view==='login'?'current-password':'new-password'} value={pass} onChange={e=>P(e.target.value)}/>{view==='register'&&<><small className="mutedtext">Кемінде 6 таңба</small><label className="fieldlabel">Құпиясөзді қайтала</label><input className="search" type="password" autoComplete="new-password" value={confirm} onChange={e=>C(e.target.value)}/></>}{!serverOnline&&view==='login'&&<div className="feedback no">Серверсіз демо кіру: <b>demo</b> / <b>tilpro123</b></div>}{err&&<div className="feedback no" role="alert">{err}</div>}<button className="primary wide" disabled={busy||(!serverOnline&&view==='register')} onClick={enter}>{busy?'Күте тұр…':view==='login'?'Кіру →':'Аккаунт ашу →'}</button>{!serverOnline&&view==='register'&&<div className="feedback no">Қауіпсіз тіркелу үшін сервер қосылымы қажет. Браузерде пароль сақталмайды.</div>}</div>}
+    <footer className="authfooter">© 2026 TilPro · Жеке деректер қорғалған серверлік сессиямен сақталады</footer></div>
+}
+
